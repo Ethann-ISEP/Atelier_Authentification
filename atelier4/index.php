@@ -1,45 +1,54 @@
 <?php
-// --- CORRECTIF SPECIAL FASTCGI/ALWAYS.DATA ---
-// Si les variables sont vides mais que le header Authorization existe, on les remplit nous-mêmes
-if (empty($_SERVER['PHP_AUTH_USER']) && isset($_SERVER['HTTP_AUTHORIZATION'])) {
-    list($_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW']) = explode(':', base64_decode(substr($_SERVER['HTTP_AUTHORIZATION'], 6)));
-}
-// ----------------------------------------------
+// --- FONCTION DE RECUPERATION UNIVERSELLE ---
+function get_basic_auth_credentials() {
+    // 1. Si PHP a déjà fait le travail (rare en FastCGI)
+    if (isset($_SERVER['PHP_AUTH_USER'])) {
+        return [$_SERVER['PHP_AUTH_USER'], $_SERVER['PHP_AUTH_PW']];
+    }
 
-// Définition des bons identifiants
+    // 2. On cherche le header "Authorization" caché
+    $header = null;
+    if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+        $header = $_SERVER['HTTP_AUTHORIZATION'];
+    } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) { // Souvent ici chez Alwaysdata
+        $header = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+
+    // 3. Si on a trouvé le header, on le décrypte manuellement
+    if ($header !== null && strpos(strtolower($header), 'basic') === 0) {
+        // On enlève "Basic " et on décode
+        list($user, $pw) = explode(':', base64_decode(substr($header, 6)));
+        return [$user, $pw];
+    }
+
+    return [null, null];
+}
+
+// Récupération des identifiants via notre super fonction
+list($user_input, $pass_input) = get_basic_auth_credentials();
+
+// --- VERIFICATION ---
 $login_valide = "admin";
 $pass_valide = "header";
 
-// On vérifie si les variables sont remplies et correctes
-if (!isset($_SERVER['PHP_AUTH_USER']) || 
-    $_SERVER['PHP_AUTH_USER'] !== $login_valide || 
-    $_SERVER['PHP_AUTH_PW'] !== $pass_valide) {
-
-    // 1. On demande l'authentification
-    header('WWW-Authenticate: Basic realm="Zone Secrete Atelier 4"');
+// Si pas d'user ou mauvais mot de passe
+if ($user_input !== $login_valide || $pass_input !== $pass_valide) {
+    // On envoie les headers pour afficher la fenêtre
+    header('WWW-Authenticate: Basic realm="Zone Super Secrete"');
     header('HTTP/1.0 401 Unauthorized');
     
-    // 2. Message pour le bouton Annuler
-    echo 'Vous avez annulé l\'authentification. Accès refusé.';
+    // Message d'erreur
+    echo 'Authentification requise. (Vos données reçues : User=' . ($user_input ?: 'Rien') . ')';
     exit;
 }
 ?>
 
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <title>Atelier 4 - HTTP Headers (Corrigé)</title>
-</head>
-<body style="background-color: #e0f7fa; font-family: sans-serif;">
-    <div style="border: 2px solid #006064; padding: 20px; border-radius: 10px; max-width: 600px; margin: 50px auto;">
-        <h1 style="color: #006064;">Succès !</h1>
-        <p>Le correctif FastCGI a fonctionné. PHP a bien reçu vos identifiants.</p>
-        <hr>
-        <ul>
-            <li>User : <strong><?php echo htmlspecialchars($_SERVER['PHP_AUTH_USER']); ?></strong></li>
-            <li>Password : <strong><?php echo htmlspecialchars($_SERVER['PHP_AUTH_PW']); ?></strong></li>
-        </ul>
-    </div>
+<head><title>Atelier 4 Réussi</title></head>
+<body style="background-color: #dff0d8; color: #3c763d; padding: 50px; text-align: center;">
+    <h1>🎉 VICTOIRE !</h1>
+    <p>Vous êtes connecté en tant que : <strong><?php echo htmlspecialchars($user_input); ?></strong></p>
+    <p>Le correctif FastCGI a fonctionné.</p>
 </body>
 </html>
