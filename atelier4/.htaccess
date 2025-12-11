@@ -1,2 +1,6 @@
+# Méthode 1 : Réécriture standard
 RewriteEngine On
 RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Méthode 2 : Forçage via SetEnv (au cas où la méthode 1 échoue)
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
