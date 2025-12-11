@@ -1,12 +1,10 @@
 <?php
-// Démarrer la session
 session_start();
-
-// Détruire la session
-session_unset();
+// On détruit toutes les variables de session
+$_SESSION = array();
+// On détruit la session
 session_destroy();
-
-// Rediriger vers la page de connexion
-header('Location: index.php');
+// On redirige vers l'accueil
+header("Location: index.php");
 exit();
 ?>
