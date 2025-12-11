@@ -2,21 +2,22 @@ name: Industrialisation continue sur le serveur Alwaysdata
 
 on:
   push:
-    branches: [ "main" ] # Vérifiez si votre branche s'appelle 'main' ou 'master'
+    branches: [ "main" ]
 
 jobs:
-  # Note : J'ai fusionné la connexion et la copie pour plus d'efficacité, 
-  # car le premier job "Connexion" ne faisait rien de persistant.
   Deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Déploiement et Configuration Sécurité
         uses: appleboy/ssh-action@master
+        # On définit la variable d'environnement ici pour qu'elle soit accessible
+        env:
+          HTPASSWD_CONTENT: ${{ secrets.HTPASSWD_CONTENT }}
         with:
           host: "ssh-${{ secrets.USERNAME }}.alwaysdata.net"
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
-          # On rend le secret accessible dans le script via une variable d'environnement
+          # On indique au script d'utiliser cette variable
           envs: HTPASSWD_CONTENT
           script: |
             # 1. Définition des variables
@@ -29,11 +30,9 @@ jobs:
             git clone $REPO_URL $CLONE_DIR
 
             # 3. Synchronisation (Copie des fichiers vers www)
-            # On s'assure que le dossier www existe
             mkdir -p $TARGET_DIR
             
             if [ -d "$CLONE_DIR" ]; then
-              # On copie le contenu du clone vers www
               rsync -r --delete --exclude '.git' $CLONE_DIR/ $TARGET_DIR/
               rm -rf $CLONE_DIR
               echo "✅ Site mis à jour avec succès."
@@ -49,17 +48,14 @@ jobs:
             # Création du dossier spécifique atelier1
             mkdir -p $TARGET_DIR/atelier1
             
-            # Création du fichier .htpasswd à partir du SECRET GitHub
-            # La variable $HTPASSWD_CONTENT est injectée automatiquement par l'action
-            echo "${{ secrets.HTPASSWD_CONTENT }}" > $TARGET_DIR/atelier1/.htpasswd
+            # --- LA CORRECTION EST ICI ---
+            # Utilisation de guillemets simples ' ' pour protéger les caractères spéciaux ($)
+            echo '${{ secrets.HTPASSWD_CONTENT }}' > $TARGET_DIR/atelier1/.htpasswd
             
-            # Vérification (optionnelle)
+            # Vérification
             if [ -f "$TARGET_DIR/atelier1/.htpasswd" ]; then
                 echo "✅ Fichier .htpasswd créé avec succès."
             else
                 echo "❌ Erreur lors de la création du fichier .htpasswd"
                 exit 1
             fi
-        env:
-          # C'est ici qu'on lie le Secret GitHub à la variable utilisée dans le script ci-dessus
-          HTPASSWD_CONTENT: ${{ secrets.HTPASSWD_CONTENT }}
