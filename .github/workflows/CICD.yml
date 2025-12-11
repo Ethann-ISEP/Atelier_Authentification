@@ -10,52 +10,56 @@ jobs:
     steps:
       - name: Déploiement et Configuration Sécurité
         uses: appleboy/ssh-action@master
-        # On définit la variable d'environnement ici pour qu'elle soit accessible
         env:
-          HTPASSWD_CONTENT: ${{ secrets.HTPASSWD_CONTENT }}
+          # On récupère le mot de passe en clair (admin) depuis les secrets
+          PASS_CLAIR: ${{ secrets.HTPASSWD_CONTENT }}
         with:
           host: "ssh-${{ secrets.USERNAME }}.alwaysdata.net"
           username: ${{ secrets.USERNAME }}
           password: ${{ secrets.PASSWORD }}
-          # On indique au script d'utiliser cette variable
-          envs: HTPASSWD_CONTENT
+          # On passe la variable d'environnement au script
+          envs: PASS_CLAIR
           script: |
-            # 1. Définition des variables
+            # --- CONFIGURATION ---
             REPO_URL="https://github.com/${{ github.repository }}.git"
             TARGET_DIR="$HOME/www"
             CLONE_DIR="$HOME/clone_temp"
 
-            # 2. Nettoyage et Clonage propre
+            # --- 1. CLONAGE DU SITE ---
             rm -rf $CLONE_DIR
             git clone $REPO_URL $CLONE_DIR
 
-            # 3. Synchronisation (Copie des fichiers vers www)
+            # --- 2. DEPLOIEMENT ---
             mkdir -p $TARGET_DIR
-            
             if [ -d "$CLONE_DIR" ]; then
               rsync -r --delete --exclude '.git' $CLONE_DIR/ $TARGET_DIR/
               rm -rf $CLONE_DIR
-              echo "✅ Site mis à jour avec succès."
+              echo "✅ Site mis à jour."
             else
-              echo "❌ Erreur : Le clonage a échoué."
+              echo "❌ Erreur de clonage."
               exit 1
             fi
 
-            # --- PARTIE EXERCICE 3 : GESTION DU .HTPASSWD ---
+            # --- 3. SECURITE (Nouvelle méthode) ---
+            echo "🔒 Génération du fichier mot de passe..."
             
-            echo "🔒 Configuration de la sécurité (Basic Auth)..."
-            
-            # Création du dossier spécifique atelier1
             mkdir -p $TARGET_DIR/atelier1
             
-            # --- LA CORRECTION EST ICI ---
-            # Utilisation de guillemets simples ' ' pour protéger les caractères spéciaux ($)
-            echo '${{ secrets.HTPASSWD_CONTENT }}' > $TARGET_DIR/atelier1/.htpasswd
+            # Suppression de l'ancien fichier pour éviter les conflits
+            rm -f $TARGET_DIR/atelier1/.htpasswd
             
-            # Vérification
+            # UTILISATION DE LA COMMANDE LINUX NATIVE
+            # -c : créer un nouveau fichier
+            # -b : mode batch (on donne le mdp direct)
+            # Syntaxe : htpasswd -cb [fichier] [user] [password]
+            htpasswd -cb $TARGET_DIR/atelier1/.htpasswd admin $PASS_CLAIR
+            
+            # Vérification finale
             if [ -f "$TARGET_DIR/atelier1/.htpasswd" ]; then
-                echo "✅ Fichier .htpasswd créé avec succès."
+                echo "✅ Fichier .htpasswd généré avec succès."
+                # Affiche les permissions pour être sûr (optionnel)
+                ls -l $TARGET_DIR/atelier1/.htpasswd
             else
-                echo "❌ Erreur lors de la création du fichier .htpasswd"
+                echo "❌ Echec de la création du fichier mot de passe."
                 exit 1
             fi
